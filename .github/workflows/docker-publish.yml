@@ -64,3 +64,25 @@ jobs:
           push: true
           tags: |
             ghcr.io/akitobora/uks_checker-free-flats-bot:latest
+  deploy:
+      needs: build-and-push
+      runs-on: ubuntu-latest
+      steps:
+        - name: Deploy to VM via SSH
+          uses: appleboy/ssh-action@v0.1.7
+          with:
+            host: ${{ secrets.VM_HOST }}
+            username: ${{ secrets.VM_USER }}
+            key: ${{ secrets.VM_SSH_KEY }}
+            port: 22
+            script: |
+              # Вытащить свежий образ
+              docker pull ghcr.io/akitobora/uks_checker-free-flats-bot:latest
+              # Остановить старый
+              docker stop free-flats-bot || true
+              docker rm   free-flats-bot || true
+              # Запустить новый
+              docker run -d \
+                --name free-flats-bot \
+                --restart=unless-stopped \
+                ghcr.io/akitobora/uks_checker-free-flats-bot:latest
