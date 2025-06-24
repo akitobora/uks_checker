@@ -1,10 +1,18 @@
 # tests/test_monitor.py
 import pytest
+import os
+import sys
+
+# добавляем в sys.path папку с кодом
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import monitor      # теперь pytest найдёт monitor.py рядом
+
 from bs4 import BeautifulSoup
 from datetime import datetime
 import requests
 
-import monitor
+# … остальной код тестов без изменений …
 
 # фикстура: html со ссылками на PDF
 PDF_HTML = """
