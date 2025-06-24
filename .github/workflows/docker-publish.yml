@@ -7,46 +7,61 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: read                # читать код
-  packages: write               # пушить пакеты в GHCR
-  id-token: write               # если нужна авторизация в облаках
-  pull-requests: write
+  contents: read
+  packages: write
 
 jobs:
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pytest
+        run: pytest --maxfail=1 --disable-warnings -q
+
   build-and-push:
     runs-on: ubuntu-latest
+    needs: test
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up QEMU (for multi-arch, optional)
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to GHCR
         uses: docker/login-action@v2
         with:
-            registry: ghcr.io
-            username: ${{ github.actor }}
-            password: ${{ secrets.CR_PAT }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-
-      - name: Build and push Docker image
+      - name: Build and push image
         uses: docker/build-push-action@v4
         with:
           context: .
-          push: ${{ github.event_name != 'pull_request' }}
+          push: true
           tags: |
             ghcr.io/akitobora/uks_checker-free-flats-bot:latest
             ghcr.io/akitobora/uks_checker-free-flats-bot:${{ github.sha }}
             ghcr.io/akitobora/uks_checker-free-flats-bot:${{ github.ref_name }}
 
       - name: Image details
-        if: success()
         run: |
-          echo "Image pushed:"
-          echo " • latest ➜ ghcr.io/akitobora/uks_checker-free-flats-bot:latest"
-          echo " • sha    ➜ ghcr.io/akitobora/uks_checker-free-flats-bot:${{ github.sha }}"
-          echo " • ref    ➜ ghcr.io/akitobora/uks_checker-free-flats-bot:${{ github.ref_name }}"
+          echo "→ latest: ghcr.io/...:latest"
+          echo "→ sha:    ghcr.io/...:${{ github.sha }}"
