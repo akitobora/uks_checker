@@ -83,6 +83,6 @@ jobs:
               docker rm   uks_checker-free-flats-bot || true
               # Запустить новый
               docker run -d \
-                --name free-flats-bot \
+                --name uks_checker-free-flats-bot \
                 --restart=unless-stopped \
                 ghcr.io/akitobora/uks_checker-free-flats-bot:latest
