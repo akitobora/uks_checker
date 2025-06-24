@@ -64,25 +64,25 @@ jobs:
           push: true
           tags: |
             ghcr.io/akitobora/uks_checker-free-flats-bot:latest
-  deploy:
-      needs: build-and-push
-      runs-on: ubuntu-latest
-      steps:
-        - name: Deploy to VM via SSH
-          uses: appleboy/ssh-action@v0.1.7
-          with:
-            host: ${{ secrets.VM_HOST }}
-            username: ${{ secrets.VM_USER }}
-            key: ${{ secrets.VM_SSH_KEY }}
-            port: 22
-            script: |
-              # Вытащить свежий образ
-              docker pull ghcr.io/akitobora/uks_checker-free-flats-bot:latest
-              # Остановить старый
-              docker stop uks_checker-free-flats-bot-1 || true
-              docker rm   uks_checker-free-flats-bot-1 || true
-              # Запустить новый
-              docker run -d \
-                --name uks_checker-free-flats-bot-1 \
-                --restart=unless-stopped \
-                ghcr.io/akitobora/uks_checker-free-flats-bot:latest
+   deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository (для доступа к docker-compose.yml, если нужно)
+        uses: actions/checkout@v4
+        # либо пропустите, если на сервере compose-файл уже лежит
+
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy to VM via SSH and docker-compose
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+            cd /uks_checker
+            # подтягиваем новую версию образа
+            docker compose pull free-flats-bot
+            # пересоздаём контейнер без даунтайма
+            docker compose up -d --no-deps --remove-orphans free-flats-bot
+          EOF
