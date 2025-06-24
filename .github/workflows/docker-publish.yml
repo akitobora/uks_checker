@@ -79,10 +79,10 @@ jobs:
               # Вытащить свежий образ
               docker pull ghcr.io/akitobora/uks_checker-free-flats-bot:latest
               # Остановить старый
-              docker stop uks_checker-free-flats-bot || true
-              docker rm   uks_checker-free-flats-bot || true
+              docker stop uks_checker-free-flats-bot-1 || true
+              docker rm   uks_checker-free-flats-bot-1 || true
               # Запустить новый
               docker run -d \
-                --name uks_checker-free-flats-bot \
+                --name uks_checker-free-flats-bot-1 \
                 --restart=unless-stopped \
                 ghcr.io/akitobora/uks_checker-free-flats-bot:latest
