@@ -8,14 +8,21 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: read      # читать код
-  packages: write     # пушить пакеты в GHCR
-  id-token: write     # если нужен OIDC
+  contents: read
+  packages: write
 
 jobs:
-  # 1) Прогоняем тесты
   test:
     runs-on: ubuntu-latest
+    env:                                  # <<< вот тут
+      BOT_TOKEN:         fake_token
+      CHAT_ID:           "0"
+      PAGE_URL:          "https://example.com"
+      NEWS_PAGE_URL:     "https://example.com"
+      BASE_URL:          "https://example.com"
+      STATE_FILE:        "last.json"
+      CHECK_EVERY_MINUTES: "1"
+      NEWS_CHECK_INTERVAL: "1"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -33,7 +40,6 @@ jobs:
       - name: Run pytest
         run: pytest --maxfail=1 --disable-warnings -q
 
-  # 2) Билдим и пушим Docker-образ, но только если тесты прошли
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
@@ -41,13 +47,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up QEMU (optional for multi-arch)
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to GHCR
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
@@ -61,12 +64,3 @@ jobs:
           push: true
           tags: |
             ghcr.io/akitobora/uks_checker-free-flats-bot:latest
-            ghcr.io/akitobora/uks_checker-free-flats-bot:${{ github.sha }}
-            ghcr.io/akitobora/uks_checker-free-flats-bot:${{ github.ref_name }}
-
-      - name: Image details
-        if: success()
-        run: |
-          echo "→ latest: ghcr.io/akitobora/uks_checker-free-flats-bot:latest"
-          echo "→ sha:    ghcr.io/akitobora/uks_checker-free-flats-bot:${{ github.sha }}"
-          echo "→ ref:    ghcr.io/akitobora/uks_checker-free-flats-bot:${{ github.ref_name }}"
