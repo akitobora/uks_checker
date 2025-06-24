@@ -14,15 +14,16 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:                                  # <<< вот тут
-      BOT_TOKEN:         fake_token
-      CHAT_ID:           "0"
-      PAGE_URL:          "https://example.com"
-      NEWS_PAGE_URL:     "https://example.com"
-      BASE_URL:          "https://example.com"
-      STATE_FILE:        "last.json"
-      CHECK_EVERY_MINUTES: "1"
-      NEWS_CHECK_INTERVAL: "1"
+    env:
+      BOT_TOKEN:          fake_token
+      CHAT_ID:            "0"
+      # разные тестовые URL
+      PAGE_URL:           "https://example.com/pdf"      # для PDF
+      NEWS_PAGE_URL:      "https://example.com/news"     # для новостей
+      BASE_URL:           "https://example.com"
+      STATE_FILE:         "last.json"
+      CHECK_EVERY_MINUTES:"1"
+      NEWS_CHECK_INTERVAL:"1"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
