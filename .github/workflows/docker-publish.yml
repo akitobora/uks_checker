@@ -38,7 +38,7 @@ jobs:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
           tags: |
-            ghcr.io/akitobora/uks_checker-free-flats-bot:latest
+            ghcr.io/akitobora/uks_checker-free-flats-bot:worked
             ghcr.io/akitobora/uks_checker-free-flats-bot:${{ github.sha }}
             ghcr.io/akitobora/uks_checker-free-flats-bot:${{ github.ref_name }}
 
@@ -46,6 +46,6 @@ jobs:
         if: success()
         run: |
           echo "Image pushed:"
-          echo " • latest ➜ ghcr.io/akitobora/uks_checker-free-flats-bot:latest"
+          echo " • latest ➜ ghcr.io/akitobora/uks_checker-free-flats-bot:worked"
           echo " • sha    ➜ ghcr.io/akitobora/uks_checker-free-flats-bot:${{ github.sha }}"
           echo " • ref    ➜ ghcr.io/akitobora/uks_checker-free-flats-bot:${{ github.ref_name }}"
