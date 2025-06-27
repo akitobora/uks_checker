@@ -21,8 +21,8 @@ jobs:
 
     - name: Build and push image to YCR
       run: |
-        docker build -t cr.yandex/ru-central1/crpkei0r7il07rbflqkj/uks-checker:latest .
-        docker push cr.yandex/ru-central1/crpkei0r7il07rbflqkj/uks-checker:latest
+        docker build -t cr.yandex/ru-central1-b/crpkei0r7il07rbflqkj/uks-checker:latest .
+        docker push cr.yandex/ru-central1-b/crpkei0r7il07rbflqkj/uks-checker:latest
 
     - name: Deploy to Yandex VM via SSH
       uses: appleboy/ssh-action@v1.0.0
