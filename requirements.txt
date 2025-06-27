@@ -4,4 +4,3 @@ python-telegram-bot
 apscheduler
 nano
 pytest
-logging
