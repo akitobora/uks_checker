@@ -1,69 +1,216 @@
-# tests/test_monitor.py
-import pytest
+# monitor.py
+
 import os
-import sys
-
-# добавляем в sys.path папку с кодом
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-import monitor      # теперь pytest найдёт monitor.py рядом
-
-from bs4 import BeautifulSoup
-from datetime import datetime
+import re
+import json
+import logging
+import hashlib               # ← добавили
 import requests
 
-# … остальной код тестов без изменений …
+from datetime import datetime
+from urllib.parse import urljoin
+from bs4 import BeautifulSoup
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    ContextTypes,
+)
 
-# фикстура: html со ссылками на PDF
-PDF_HTML = """
-<html><body>
-  <a href="/assets/files/svobodnye-kvartiry/free_flats_01012021.pdf">old</a>
-  <a href="/assets/files/svobodnye-kvartiry/free_flats_02022022.pdf">new</a>
-</body></html>
-"""
+import config
 
-# фикстура: html со списком новостей
-NEWS_HTML = """
-<html><body>
-  <div>
-    <a href="/novosti/1">Первая новость</a>
-  </div>
-  <div>
-    <a href="/novosti/2">Вторая новость</a>
-  </div>
-</body></html>
-"""
+# ──────────────────────────────────────────────────────────
+logging.basicConfig(
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
-class DummyResp:
-    def __init__(self, text, status=200):
-        self.text = text
-        self.status_code = status
-    def raise_for_status(self):
-        if self.status_code != 200:
-            raise requests.HTTPError(f"Status {self.status_code}")
+session = requests.Session()
+session.headers["User-Agent"] = "Mozilla/5.0"
 
-# замокать вызовы session.get
-@pytest.fixture(autouse=True)
-def mock_session(monkeypatch):
-    class FakeSession:
-        def __init__(self):
-            self.headers = {}
-        def get(self, url, *args, **kwargs):
-            if monitor.config.PAGE_URL in url:
-                return DummyResp(PDF_HTML)
-            if monitor.config.NEWS_PAGE_URL in url:
-                return DummyResp(NEWS_HTML)
-            return DummyResp("", status=404)
-    monkeypatch.setattr(monitor, "session", FakeSession())
+# ──────────────────────────────────────────────────────────
+def load_state() -> dict:
+    """Гарантируем ключи last_pdf, last_pdf_hash и last_news_url."""
+    if os.path.exists(config.STATE_FILE):
+        st = json.load(open(config.STATE_FILE, "r", encoding="utf-8"))
+    else:
+        st = {}
+    st.setdefault("last_pdf", None)
+    st.setdefault("last_pdf_hash", None)    # ← новый ключ
+    st.setdefault("last_news_url", None)
+    return st
 
-def test_fetch_latest_pdf():
-    fn, url = monitor.fetch_latest_pdf()
-    assert fn == "free_flats_02022022.pdf"
-    assert url.endswith("/assets/files/svobodnye-kvartiry/free_flats_02022022.pdf")
+def save_state(st: dict):
+    with open(config.STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(st, f, ensure_ascii=False, indent=2)
 
-def test_fetch_latest_news():
-    title, url = monitor.fetch_latest_news()
-    assert title == "Первая новость" or title == "Вторая новость"
-    # по условию берётся первая ссылка в DOM
-    assert title == "Первая новость"
-    assert url.endswith("/novosti/1")
+# ──────────────────────────────────────────────────────────
+def fetch_latest_pdf() -> tuple[str, str] | tuple[None, None]:
+    resp = session.get(config.PAGE_URL)
+    resp.raise_for_status()
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    candidates = []
+    for a in soup.find_all("a", href=True):
+        m = re.search(r"(free_flats_(\d{8})\.pdf)$", a["href"])
+        if not m:
+            continue
+        fn   = m.group(1)
+        ds   = m.group(2)
+        dt = None
+        for fmt in ("%Y%m%d","%d%m%Y"):
+            try:
+                dt = datetime.strptime(ds, fmt)
+                break
+            except ValueError:
+                continue
+        if not dt:
+            continue
+        url = urljoin(config.BASE_URL, a["href"])
+        candidates.append((dt, fn, url))
+
+    if not candidates:
+        return None, None
+    _, fname, furl = max(candidates, key=lambda x: x[0])
+    return fname, furl
+
+def fetch_latest_news() -> tuple[str, str] | tuple[None, None]:
+    resp = session.get(config.NEWS_PAGE_URL)
+    resp.raise_for_status()
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    a = soup.find("a", href=re.compile(r"^/novosti/"))
+    if not a:
+        return None, None
+
+    title = a.get_text(strip=True)
+    url   = urljoin(config.BASE_URL, a["href"])
+    return title, url
+
+# ──────────────────────────────────────────────────────────
+async def scheduled_pdf(context: ContextTypes.DEFAULT_TYPE):
+    st           = load_state()
+    last_hash    = st["last_pdf_hash"]       # ← берём старый хеш
+    fname, furl  = fetch_latest_pdf()
+    if not fname:
+        return
+
+    # скачиваем и считаем хеш
+    logger.info(f"Downloading PDF for hash check: {furl}")
+    r = session.get(furl)
+    r.raise_for_status()
+    data = r.content
+    new_hash = hashlib.sha256(data).hexdigest()
+
+    # если хеш не изменился — выходим
+    if new_hash == last_hash:
+        logger.info("PDF hash unchanged, skipping")
+        return
+
+    # сохраняем файл локально
+    local = os.path.join("downloads", fname)
+    os.makedirs(os.path.dirname(local), exist_ok=True)
+    with open(local, "wb") as f:
+        f.write(data)
+
+    # шлём в телеграм
+    await context.bot.send_message(
+        chat_id=config.CHAT_ID,
+        text="✅ Вышла новая редакция файла"
+    )
+    await context.bot.send_document(
+        chat_id=config.CHAT_ID,
+        document=open(local, "rb")
+    )
+    logger.info(f"Sent PDF {fname}")
+
+    # обновляем состояние
+    st["last_pdf"]      = fname
+    st["last_pdf_hash"] = new_hash    # ← сохраняем новый хеш
+    save_state(st)
+
+async def scheduled_news(context: ContextTypes.DEFAULT_TYPE):
+    st            = load_state()
+    last_news_url = st["last_news_url"]
+
+    title, url = fetch_latest_news()
+    if not url or url == last_news_url:
+        return
+
+    text = f"📰 Новая новость:\n{title}\n{url}"
+    await context.bot.send_message(chat_id=config.CHAT_ID, text=text)
+    logger.info(f"Sent news {url}")
+
+    st["last_news_url"] = url
+    save_state(st)
+
+# ──────────────────────────────────────────────────────────
+async def cmd_state(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    st = load_state()
+    await update.message.reply_text(
+        f"Текущее состояние:\n```json\n{json.dumps(st, indent=2, ensure_ascii=False)}\n```",
+        parse_mode="MarkdownV2"
+    )
+
+async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Привет! Слежу за PDF и новостями.\n"
+        "Команды:\n"
+        "/getpdf — получить текущий PDF\n"
+        "/getnews — получить текущую новость\n"
+        "/state — показать сохранённое состояние"
+    )
+
+async def cmd_getpdf(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    fname, furl = fetch_latest_pdf()
+    if not fname:
+        return await update.message.reply_text("PDF не найден.")
+    # скачиваем просто для ручного запроса, без хешей
+    local = os.path.join("downloads", fname)
+    os.makedirs(os.path.dirname(local), exist_ok=True)
+    r = session.get(furl, stream=True)
+    r.raise_for_status()
+    with open(local, "wb") as f:
+        for chunk in r.iter_content(32_768):
+            f.write(chunk)
+    await ctx.bot.send_message(chat_id=update.effective_chat.id,
+                               text="✅ Текущий PDF:")
+    await ctx.bot.send_document(chat_id=update.effective_chat.id,
+                                document=open(local, "rb"))
+
+async def cmd_getnews(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    title, url = fetch_latest_news()
+    if not url:
+        return await update.message.reply_text("Новостей не найдено.")
+    await ctx.bot.send_message(
+        chat_id=update.effective_chat.id,
+        text=f"📰 Текущая новость:\n{title}\n{url}"
+    )
+
+# ──────────────────────────────────────────────────────────
+def main():
+    app = (
+        ApplicationBuilder()
+        .token(config.BOT_TOKEN)
+        .build()
+    )
+
+    jq = app.job_queue
+    jq.run_repeating(scheduled_pdf,
+                     interval=config.CHECK_EVERY_MINUTES * 60,
+                     first=5)
+    jq.run_repeating(scheduled_news,
+                     interval=config.NEWS_CHECK_INTERVAL * 60,
+                     first=10)
+
+    app.add_handler(CommandHandler("start",  cmd_start))
+    app.add_handler(CommandHandler("state",  cmd_state))
+    app.add_handler(CommandHandler("getpdf", cmd_getpdf))
+    app.add_handler(CommandHandler("getnews",cmd_getnews))
+
+    logger.info("Bot started, polling…")
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
