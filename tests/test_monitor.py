@@ -16,7 +16,7 @@ from telegram.ext import (
     CommandHandler,
     ContextTypes,
 )
-from uks_checker import config, monitor
+import config, monitor
 
 # ──────────────────────────────────────────────────────────
 logging.basicConfig(

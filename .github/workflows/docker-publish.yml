@@ -36,10 +36,13 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
+
       - name : Install library in dev mode
-        run: pip install -e .
+        run: pip install -e ../
+        working-directory: ./uks_checker
 
       - name: Run pytest
+        working-directory: ./uks_checker
         run: pytest --maxfail=1 --disable-warnings -q
 
   build-and-push:
