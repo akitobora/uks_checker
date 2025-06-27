@@ -4,6 +4,7 @@ import os
 import re
 import json
 import logging
+import hashlib               # ← добавили
 import requests
 
 from datetime import datetime
@@ -25,18 +26,28 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Сессия для HTTP-запросов
 session = requests.Session()
 session.headers["User-Agent"] = "Mozilla/5.0"
 
 # ──────────────────────────────────────────────────────────
+"""
+Loads and initializes the state dictionary from a file.
+
+This function loads the state dictionary from a JSON file specified in the config. If the file doesn't exist,
+it initializes an empty dictionary. The function ensures the dictionary contains the keys 'last_pdf',
+'last_pdf_hash', and 'last_news_url' with default values of None if they don't exist.
+
+Returns:
+    dict: The state dictionary with guaranteed keys 'last_pdf', 'last_pdf_hash', and 'last_news_url'.
+"""
 def load_state() -> dict:
-    """Гарантируем ключи last_pdf и last_news_url."""
+    """Гарантируем ключи last_pdf, last_pdf_hash и last_news_url."""
     if os.path.exists(config.STATE_FILE):
         st = json.load(open(config.STATE_FILE, "r", encoding="utf-8"))
     else:
         st = {}
     st.setdefault("last_pdf", None)
+    st.setdefault("last_pdf_hash", None)    # ← новый ключ
     st.setdefault("last_news_url", None)
     return st
 
@@ -57,7 +68,6 @@ def fetch_latest_pdf() -> tuple[str, str] | tuple[None, None]:
             continue
         fn   = m.group(1)
         ds   = m.group(2)
-        # парсим дату
         dt = None
         for fmt in ("%Y%m%d","%d%m%Y"):
             try:
@@ -72,15 +82,10 @@ def fetch_latest_pdf() -> tuple[str, str] | tuple[None, None]:
 
     if not candidates:
         return None, None
-    # самая свежая по дате
     _, fname, furl = max(candidates, key=lambda x: x[0])
     return fname, furl
 
 def fetch_latest_news() -> tuple[str, str] | tuple[None, None]:
-    """
-    Возвращает (title, absolute_url) первой новости
-    на странице с новостями (самая свежая сверху).
-    """
     resp = session.get(config.NEWS_PAGE_URL)
     resp.raise_for_status()
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -95,24 +100,31 @@ def fetch_latest_news() -> tuple[str, str] | tuple[None, None]:
 
 # ──────────────────────────────────────────────────────────
 async def scheduled_pdf(context: ContextTypes.DEFAULT_TYPE):
-    st       = load_state()
-    last_pdf = st["last_pdf"]
-
-    fname, furl = fetch_latest_pdf()
-    if not fname or fname == last_pdf:
+    st           = load_state()
+    last_hash    = st["last_pdf_hash"]       # ← берём старый хеш
+    fname, furl  = fetch_latest_pdf()
+    if not fname:
         return
 
-    # скачать
+    # скачиваем и считаем хеш
+    logger.info(f"Downloading PDF for hash check: {furl}")
+    r = session.get(furl)
+    r.raise_for_status()
+    data = r.content
+    new_hash = hashlib.sha256(data).hexdigest()
+
+    # если хеш не изменился — выходим
+    if new_hash == last_hash:
+        logger.info("PDF hash unchanged, skipping")
+        return
+
+    # сохраняем файл локально
     local = os.path.join("downloads", fname)
     os.makedirs(os.path.dirname(local), exist_ok=True)
-    logger.info(f"Downloading PDF {furl}")
-    r = session.get(furl, stream=True)
-    r.raise_for_status()
     with open(local, "wb") as f:
-        for chunk in r.iter_content(32_768):
-            f.write(chunk)
+        f.write(data)
 
-    # уведомление + PDF
+    # шлём в телеграм
     await context.bot.send_message(
         chat_id=config.CHAT_ID,
         text="✅ Вышла новая редакция файла"
@@ -123,11 +135,13 @@ async def scheduled_pdf(context: ContextTypes.DEFAULT_TYPE):
     )
     logger.info(f"Sent PDF {fname}")
 
-    st["last_pdf"] = fname
+    # обновляем состояние
+    st["last_pdf"]      = fname
+    st["last_pdf_hash"] = new_hash    # ← сохраняем новый хеш
     save_state(st)
 
 async def scheduled_news(context: ContextTypes.DEFAULT_TYPE):
-    st           = load_state()
+    st            = load_state()
     last_news_url = st["last_news_url"]
 
     title, url = fetch_latest_news()
@@ -162,6 +176,7 @@ async def cmd_getpdf(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     fname, furl = fetch_latest_pdf()
     if not fname:
         return await update.message.reply_text("PDF не найден.")
+    # скачиваем просто для ручного запроса, без хешей
     local = os.path.join("downloads", fname)
     os.makedirs(os.path.dirname(local), exist_ok=True)
     r = session.get(furl, stream=True)
@@ -192,7 +207,6 @@ def main():
     )
 
     jq = app.job_queue
-    # расписание для PDF и новостей
     jq.run_repeating(scheduled_pdf,
                      interval=config.CHECK_EVERY_MINUTES * 60,
                      first=5)
