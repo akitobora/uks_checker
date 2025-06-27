@@ -37,7 +37,7 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
       - name : Install library in dev mode
-        run: pip install -e .
+        run: pip install -e 
 
       - name: Run pytest
         run: pytest --maxfail=1 --disable-warnings -q
