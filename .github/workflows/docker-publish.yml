@@ -64,7 +64,7 @@ jobs:
           push: true
           tags: |
             ghcr.io/akitobora/uks_checker-free-flats-bot:latest
-   deploy:
+  deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
     steps:
