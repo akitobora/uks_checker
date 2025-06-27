@@ -7,6 +7,8 @@ import logging
 import hashlib               # ← добавили
 import requests
 
+from uks_checker import config
+from uks_checker import monitor
 from datetime import datetime
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
