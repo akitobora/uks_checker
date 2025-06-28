@@ -36,33 +36,36 @@ jobs:
           # Сохраним тег, чтобы потом на VM точно знать, что запускать
           echo "${TAG}" > image_tag.txt
 
-      - name: Deploy to Yandex VM via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.YC_VM_HOST }}
-          username: ${{ secrets.YC_VM_USER }}
-          key: ${{ secrets.VM_SSH_KEY }}
-          script: |
-            set -e
-
-            # Установим yc-cli + helper, если нужно
-            if ! command -v yc &>/dev/null; then
-              curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
-              export PATH="$HOME/.local/bin:$PATH"
-            fi
-            if ! command -v docker-credential-yc &>/dev/null; then
-              echo '${{ secrets.YC_SA_JSON }}' > ~/sa.json
-              yc init --service-account-key-file ~/sa.json --force
-              yc docker-helper install
-            fi
-
-            # Логинимся и запускаем последний тег
-            yc cr login
-            cd uks_checker
-
-            # Получим тот же TAG, что записали в первый шаг
-            TAG=$(cat ../image_tag.txt)
-            echo "Deploying $IMAGE:$TAG"
-
-            docker compose pull
-            docker compose up -d
+          - name: Deploy to Yandex VM via SSH
+          uses: appleboy/ssh-action@v1
+          with:
+            host: ${{ secrets.YC_VM_HOST }}
+            username: ${{ secrets.YC_VM_USER }}
+            key: ${{ secrets.VM_SSH_KEY }}
+            script: |
+              set -e
+    
+              # 1) Установим Yandex Cloud CLI, если нет
+              if ! command -v yc &>/dev/null; then
+                curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+                # сразу поднимем PATH, чтобы yc был в этом же процессе доступен
+                export PATH="$HOME/.local/bin:$PATH"
+              fi
+    
+              # 2) Установим credential helper для Docker
+              #    (он тоже скопируется в ~/.local/bin)
+              if ! command -v docker-credential-yc &>/dev/null; then
+                echo '${{ secrets.YC_SA_JSON }}' > ~/sa.json
+                yc init --service-account-key-file ~/sa.json --force
+                yc docker-helper install
+                export PATH="$HOME/.local/bin:$PATH"
+              fi
+    
+              # 3) Логинимся в реестр и деплоим
+              yc cr login
+    
+              cd uks_checker
+              TAG=$(cat ../image_tag.txt)
+    
+              docker compose pull
+              docker compose up -d
