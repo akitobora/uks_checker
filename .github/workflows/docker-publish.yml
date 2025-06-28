@@ -36,9 +36,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
 
     steps:
-
-    - name: Checkout repository
-      uses: actions/checkout@v3
+    - uses: actions/checkout@v3
 
     - name: Start SSH-agent
       uses: webfactory/ssh-agent@v0.5.4
@@ -52,14 +50,22 @@ jobs:
           ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/uks_checker/
 
     - name: Deploy via docker-compose
+      env:
+        GHCR_USER: ${{ github.actor }}
+        GHCR_TOKEN: ${{ secrets.CR_PAT }}       # Personal Access Token scope=read:packages
       run: |
         ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
-          cd ~/uks_checker
-          # подтягиваем свежий образ
+          cd ~/free-flats-bot
+
+          # логинимся в GHCR, чтобы было разрешение на pull
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+
+          # подтягиваем и перезапускаем сервис
           docker compose pull free-flats-bot
-          # запускаем, переменные из .env уже подхватятся автоматически
           docker compose up -d free-flats-bot
-          # чистим неиспользуемые образы
+
+          # чистим висячие образы
           docker image prune -f
         EOF
+

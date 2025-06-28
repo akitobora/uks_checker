@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   free-flats-bot:
     image: ghcr.io/akitobora/uks_checker/free-flats-bot:latest
