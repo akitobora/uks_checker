@@ -8,52 +8,61 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
 
+    # Определим IMAGE один раз, чтобы не промахнуться со слешами
+    env:
+      IMAGE: cr.yandex/crpkei0r7il07rbflqkj/uks-checker
+
     steps:
-    # 1) Создаём логику пуша в YCR
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    # 2) Логинимся в Yandex Container Registry
-    #    — ставит yc-cli + docker-credential-yc, делает docker login
-    - name: Login to Yandex CR
-      uses: yc-actions/yc-cr-login@v0.1-alpha
-      with:
-        # сервис-аккаунт в формате JSON, выложенный в GitHub Secrets
-        yc-sa-json-credentials: ${{ secrets.YC_SA_JSON_CREDENTIALS }}
+      - name: Login to Yandex CR
+        run: echo "${{ secrets.YC_CR_TOKEN }}" | docker login --username oauth --password-stdin cr.yandex
 
-    # 3) Собираем и пушим образ с уникальным тегом (SHA коммита)
-    - name: Build and push image
-      env:
-        IMAGE: cr.yandex/${{ secrets.YC_CR_REGISTRY }}/${{ secrets.YC_CR_REPOSITORY }}
-        TAG: ${{ github.sha }}
-      run: |
-        docker build -t $IMAGE:$TAG .
-        docker push $IMAGE:$TAG
+      - name: Build and push image
+        run: |
+          # Берём короткий SHA (7 символов) для тега
+          TAG=${GITHUB_SHA::7}
+          echo "IMAGE = $IMAGE"
+          echo "TAG   = $TAG"
 
-    # 4) Деплой на вашу VM по SSH
-    - name: Deploy to Yandex VM via SSH
-      uses: appleboy/ssh-action@v1
-      with:
-        host: ${{ secrets.YC_VM_HOST }}
-        username: ${{ secrets.YC_VM_USER }}
-        key: ${{ secrets.VM_SSH_KEY }}
-        script: |
-          set -e
-          # — ставим yc-cli и credential-helper, если их нет
-          if ! command -v yc > /dev/null; then
-            curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
-            export PATH="$HOME/.local/bin:$PATH"
-          fi
-          if ! command -v docker-credential-yc > /dev/null; then
-            yc init --service-account-key-file <(echo '${{ secrets.YC_SA_JSON_CREDENTIALS }}') --force
-            yc docker-helper install
-          fi
+          # Собираем и пушим
+          docker build -t "${IMAGE}:${TAG}" .
+          docker push "${IMAGE}:${TAG}"
 
-          # — логинимся и деплоим новый образ
-          yc cr login
-          cd uks_checker
-          docker compose pull
-          docker compose up -d
+          # Сохраним тег, чтобы потом на VM точно знать, что запускать
+          echo "${TAG}" > image_tag.txt
+
+      - name: Deploy to Yandex VM via SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.YC_VM_HOST }}
+          username: ${{ secrets.YC_VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -e
+
+            # Установим yc-cli + helper, если нужно
+            if ! command -v yc &>/dev/null; then
+              curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+              export PATH="$HOME/.local/bin:$PATH"
+            fi
+            if ! command -v docker-credential-yc &>/dev/null; then
+              echo '${{ secrets.YC_SA_JSON }}' > ~/sa.json
+              yc init --service-account-key-file ~/sa.json --force
+              yc docker-helper install
+            fi
+
+            # Логинимся и запускаем последний тег
+            yc cr login
+            cd uks_checker
+
+            # Получим тот же TAG, что записали в первый шаг
+            TAG=$(cat ../image_tag.txt)
+            echo "Deploying $IMAGE:$TAG"
+
+            docker compose pull
+            docker compose up -d
