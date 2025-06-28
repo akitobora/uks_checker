@@ -1,7 +1,12 @@
 import pytest
 import requests
 from urllib.parse import urljoin
-from uks_checker.monitor import fetch_latest_pdf, fetch_latest_news, fetch_stranica, session
+from uks_checker.monitor import (
+    fetch_latest_pdf,
+    fetch_latest_news,
+    fetch_stranica,
+    session,
+)
 from uks_checker.monitor import config
 
 
