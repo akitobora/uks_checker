@@ -41,7 +41,7 @@ jobs:
               - name: Start SSH-agent
                 uses: webfactory/ssh-agent@v0.5.4
                 with:
-                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+                  ssh-private-key: ${{ secrets.VM_SSH_KEY }}
         
               - name: Copy compose + .env to VM
                 run: |
@@ -55,7 +55,7 @@ jobs:
                     cd ~/free-flats-bot
         
                     # логинимся в GHCR напрямую, подставляя секрет и логин на этапе запуска
-                    echo "${{ secrets.GHCR_PAT }}" \
+                    echo "${{ secrets.CR_PAT }}" \
                       | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
         
                     # подтягиваем и перезапускаем сервис
