@@ -1,10 +1,8 @@
 import pytest
 import requests
 from urllib.parse import urljoin
-
-import monitor
-from monitor import fetch_latest_pdf, fetch_latest_news, fetch_stranica, session
-from monitor import config
+from uks_checker.monitor import fetch_latest_pdf, fetch_latest_news, fetch_stranica, session
+from uks_checker.monitor import config
 
 
 class DummyResponse:
@@ -21,7 +19,7 @@ class DummyResponse:
 
 
 @pytest.fixture(autouse=True)
-def fix_config(monkeypatch):
+def fix_config(monkeypatch: pytest.MonkeyPatch):
     """Подменяем URL-ы на фиктивные, чтобы не ходить в интернет"""
     monkeypatch.setattr(config, "PAGE_URL", "http://dummy/pdf-page")
     monkeypatch.setattr(config, "BASE_URL", "http://base")
@@ -30,7 +28,7 @@ def fix_config(monkeypatch):
     yield
 
 
-def test_fetch_latest_pdf_picks_newest_and_skips_404(monkeypatch):
+def test_fetch_latest_pdf_picks_newest_and_skips_404(monkeypatch: pytest.MonkeyPatch):
     html = """
     <html><body>
       <a href="/files/free_flats_01012020.pdf">old</a>
@@ -57,7 +55,7 @@ def test_fetch_latest_pdf_picks_newest_and_skips_404(monkeypatch):
     assert url == urljoin(config.BASE_URL, "/files/free_flats_02022020_.pdf")
 
 
-def test_fetch_latest_pdf_all_404_returns_none(monkeypatch):
+def test_fetch_latest_pdf_all_404_returns_none(monkeypatch: pytest.MonkeyPatch):
     html = """
     <html><body>
       <a href="/files/free_flats_01012020.pdf">only</a>
@@ -72,7 +70,7 @@ def test_fetch_latest_pdf_all_404_returns_none(monkeypatch):
     assert name is None and url is None
 
 
-def test_fetch_latest_pdf_no_matches(monkeypatch):
+def test_fetch_latest_pdf_no_matches(monkeypatch: pytest.MonkeyPatch):
     html = "<html><body><a href='/foo/bar.txt'>foo</a></body></html>"
     monkeypatch.setattr(session, "get", lambda *args, **kw: DummyResponse(text=html))
 
@@ -80,7 +78,7 @@ def test_fetch_latest_pdf_no_matches(monkeypatch):
     assert name is None and url is None
 
 
-def test_fetch_latest_news_success(monkeypatch):
+def test_fetch_latest_news_success(monkeypatch: pytest.MonkeyPatch):
     html = """
     <html><body>
       <a href="/novosti/123">Заголовок новости</a>
@@ -93,7 +91,7 @@ def test_fetch_latest_news_success(monkeypatch):
     assert url == urljoin(config.BASE_URL, "/novosti/123")
 
 
-def test_fetch_latest_news_no_link(monkeypatch):
+def test_fetch_latest_news_no_link(monkeypatch: pytest.MonkeyPatch):
     html = "<html><body><p>Нет новостей</p></body></html>"
     monkeypatch.setattr(session, "get", lambda *args, **kw: DummyResponse(text=html))
 
@@ -101,7 +99,7 @@ def test_fetch_latest_news_no_link(monkeypatch):
     assert title is None and url is None
 
 
-def test_fetch_stranica_returns_body_text(monkeypatch):
+def test_fetch_stranica_returns_body_text(monkeypatch: pytest.MonkeyPatch):
     html = """
       <html>
         <head><title>Test</title></head>
@@ -119,7 +117,7 @@ def test_fetch_stranica_returns_body_text(monkeypatch):
     assert "\n" in text  # между блоками есть разделитель
 
 
-def test_date_parsing_variants(monkeypatch):
+def test_date_parsing_variants(monkeypatch: pytest.MonkeyPatch):
     # Проверяем обе формы YYYYMMDD и DDMMYYYY
     html = """
     <html><body>

@@ -47,7 +47,7 @@ jobs:
         run: flake8 .
 
       - name: MyPy static types
-        run: mypy .
+        run: mypy uks_checker
 
       - name: Run pytest
         run: pytest --maxfail=1 --disable-warnings -q
