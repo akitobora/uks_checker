@@ -48,8 +48,8 @@ jobs:
                     ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} <<'EOF'
                       cd ~/free-flats-bot
                       git pull origin main
-                      docker-compose pull free-flats-bot
-                      docker-compose up -d
+                      docker compose pull free-flats-bot
+                      docker compose up -d
                     EOF
                     docker image prune -f
                     EOF
