@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.10, 3.11]    # <-- заменили 3.1 на 3.10
+        python-version: ["3.x"]    # <-- заменили 3.1 на 3.10
 
     steps:
       - name: Checkout code
