@@ -1,4 +1,4 @@
-# monitor.py
+# monitor.py test1234
 
 import os
 import re
@@ -107,7 +107,7 @@ async def scheduled_pdf(context: ContextTypes.DEFAULT_TYPE):
         return
 
     # скачиваем и считаем хеш
-    logger.info(f"Downloading PDF for hash check: {furl}")
+    logger.info(f"Скачивание PDF для проверки хеша: {furl}")
     r = session.get(furl)
     r.raise_for_status()
     data = r.content
