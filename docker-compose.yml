@@ -2,11 +2,13 @@ version: "3.8"
 
 services:
   free-flats-bot:
-    image: cr.yandex/ru-central1/crpkei0r7il07rbflqkj/uks-checker:latest
+    image: ghcr.io/${GITHUB_REPOSITORY}/uks_checker_free-flats-bot:latest
+    container_name: free-flats-bot
     restart: unless-stopped
     env_file:
       - .env
     environment:
+      -BOT_TOKEN=${BOT_TOKEN}
       - TZ=Europe/Minsk  
     volumes:
       # чтобы сохранялось состояние между перезапусками

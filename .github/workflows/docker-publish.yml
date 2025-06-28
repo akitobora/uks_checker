@@ -1,72 +1,63 @@
-name: Build, Push and Deploy to Yandex VM
+name: CI/CD
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
 
-    # Определим IMAGE один раз, чтобы не промахнуться со слешами
-    env:
-      IMAGE: cr.yandex/crpkei0r7il07rbflqkj/uks-checker
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v3
+
+      - name: Set up QEMU 
+        uses: docker/setup-qemu-action@v2
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v2
 
-      - name: Login to Yandex CR
-        run: echo "${{ secrets.YC_CR_TOKEN }}" | docker login --username oauth --password-stdin cr.yandex
-
-      - name: Build and push image
-        run: |
-          # Берём короткий SHA (7 символов) для тега
-          TAG=${GITHUB_SHA::7}
-          echo "IMAGE = $IMAGE"
-          echo "TAG   = $TAG"
-
-          # Собираем и пушим
-          docker build -t "${IMAGE}:${TAG}" .
-          docker push "${IMAGE}:${TAG}"
-
-          # Сохраним тег, чтобы потом на VM точно знать, что запускать
-          echo "${TAG}" > image_tag.txt
-
-      - name: Deploy to Yandex VM via SSH
-        uses: appleboy/ssh-action@v1
+      - name: Log in to GHCR
+        uses: docker/login-action@v2
         with:
-           host: ${{ secrets.YC_VM_HOST }}
-           username: ${{ secrets.YC_VM_USER }}
-           key: ${{ secrets.VM_SSH_KEY }}
-           script: |
-              set -e
-    
-              # 1) Установим Yandex Cloud CLI, если нет
-              if ! command -v yc &>/dev/null; then
-                curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
-                # сразу поднимем PATH, чтобы yc был в этом же процессе доступен
-                export PATH="$HOME/.local/bin:$PATH"
-              fi
-    
-              # 2) Установим credential helper для Docker
-              #    (он тоже скопируется в ~/.local/bin)
-              exec -l $SHELL
-              if ! command -v docker-credential-yc &>/dev/null; then
-                echo '${{ secrets.YC_SA_JSON }}' > ~/sa.json
-                yc init --service-account-key-file ~/sa.json --force
-                yc docker-helper install
-                export PATH="$HOME/.local/bin:$PATH"
-              fi
-    
-              # 3) Логинимся в реестр и деплоим
-              yc cr login
-    
-              cd uks_checker
-              TAG=$(cat ../image_tag.txt)
-    
-              docker compose pull
-              docker compose up -d
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}/free-flats-bot:latest
+
+  deploy-to-vm:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Start SSH-agent
+        uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Copy docker-compose.yml to VM
+        run: |
+          scp -o StrictHostKeyChecking=no docker-compose.yml \
+              ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/free-flats-bot/docker-compose.yml
+
+      - name: Deploy via docker-compose
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+            cd ~/free-flats-bot
+
+            # тянем новую версию образа
+            docker-compose pull free-flats-bot
+
+            # поднимаем (остановит старый, если нужно) в фоновом режиме
+            BOT_TOKEN='${{ secrets.BOT_TOKEN }}' docker-compose up -d free-flats-bot
+
+            # опционально: чистим неиспользуемые образы
+            docker image prune -f
+          EOF
