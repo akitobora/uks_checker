@@ -49,13 +49,13 @@ jobs:
       run: |
         scp -o StrictHostKeyChecking=no \
           docker-compose.yml .env \
-          ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/free-flats-bot/
+          ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/uks_checker/
 
     - name: Deploy via docker-compose
       run: |
         ssh -o StrictHostKeyChecking=no \
           ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
-          cd ~/free-flats-bot
+          cd ~/uks_checker
           # подтягиваем свежий образ
           docker compose pull free-flats-bot
           # запускаем, переменные из .env уже подхватятся автоматически
