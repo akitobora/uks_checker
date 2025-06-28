@@ -196,7 +196,7 @@ async def scheduled_stranica(context: ContextTypes.DEFAULT_TYPE):
         chat_id=config.CHAT_ID,
         text=f"ℹ️ Обновления на странице 1:\n{config.STRANICA_URL}"
     )
-    logger.info("Sent page-1 update notification")
+    logger.info("Отправка инфы по странице")
 
 # ──────────────────────────────────────────────────────────
 async def cmd_state(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
