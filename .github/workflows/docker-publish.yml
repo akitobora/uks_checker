@@ -43,23 +43,16 @@ jobs:
                 with:
                   ssh-private-key: ${{ secrets.VM_SSH_KEY }}
         
-              - name: Copy compose + .env to VM
+              - name: Deploy via git-pull on VM
                 run: |
-                  scp -o -r StrictHostKeyChecking=no \
-                       \
-                      ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/free-flats-bot/
-        
-                      - name: Deploy via git-pull on VM
-                      run: |
-                        ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} <<'EOF'
-                          cd ~/free-flats-bot
-                          git pull origin main
-                          docker-compose pull free-flats-bot
-                          docker-compose up -d
-                        EOF             
-                    # чистим dangling images
+                    ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} <<'EOF'
+                      cd ~/free-flats-bot
+                      git pull origin main
+                      docker-compose pull free-flats-bot
+                      docker-compose up -d
+                    EOF
                     docker image prune -f
-                  EOF
+                    EOF
                 
         
 
