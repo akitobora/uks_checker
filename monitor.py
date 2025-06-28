@@ -19,13 +19,13 @@ import config
 
 # ──────────────────────────────────────────────────────────
 logging.basicConfig(
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    level=logging.INFO
+    format="%(asctime)s [%(levelname)s] %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
 session = requests.Session()
 session.headers["User-Agent"] = "Mozilla/5.0"
+
 
 # ──────────────────────────────────────────────────────────
 def load_state() -> dict:
@@ -33,15 +33,17 @@ def load_state() -> dict:
         st = json.load(open(config.STATE_FILE, "r", encoding="utf-8"))
     else:
         st = {}
-    st.setdefault("last_pdf",            None)
-    st.setdefault("last_pdf_hash",       None)
-    st.setdefault("last_news_url",       None)
-    st.setdefault("last_stranica_hash",  None)    # ← новый ключ
+    st.setdefault("last_pdf", None)
+    st.setdefault("last_pdf_hash", None)
+    st.setdefault("last_news_url", None)
+    st.setdefault("last_stranica_hash", None)  # ← новый ключ
     return st
+
 
 def save_state(st: dict):
     with open(config.STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(st, f, ensure_ascii=False, indent=2)
+
 
 # ──────────────────────────────────────────────────────────
 def fetch_latest_pdf() -> tuple[str, str] | tuple[None, None]:
@@ -56,7 +58,7 @@ def fetch_latest_pdf() -> tuple[str, str] | tuple[None, None]:
             continue
 
         fname = m.group(1)
-        ds    = m.group(2)
+        ds = m.group(2)
         dt = None
         for fmt in ("%Y%m%d", "%d%m%Y"):
             try:
@@ -84,6 +86,7 @@ def fetch_latest_pdf() -> tuple[str, str] | tuple[None, None]:
     _, fname, furl = max(candidates, key=lambda x: x[0])
     return fname, furl
 
+
 def fetch_latest_news() -> tuple[str, str] | tuple[None, None]:
     resp = session.get(config.NEWS_PAGE_URL, timeout=10)
     resp.raise_for_status()
@@ -94,8 +97,9 @@ def fetch_latest_news() -> tuple[str, str] | tuple[None, None]:
         return None, None
 
     title = a.get_text(strip=True)
-    url   = urljoin(config.BASE_URL, a["href"])
+    url = urljoin(config.BASE_URL, a["href"])
     return title, url
+
 
 def fetch_stranica() -> str:
     """
@@ -108,9 +112,10 @@ def fetch_stranica() -> str:
     content = soup.body.get_text(separator="\n", strip=True)
     return content
 
+
 # ──────────────────────────────────────────────────────────
 async def scheduled_pdf(context: ContextTypes.DEFAULT_TYPE):
-    st        = load_state()
+    st = load_state()
     last_hash = st["last_pdf_hash"]
 
     fname, furl = fetch_latest_pdf()
@@ -143,21 +148,18 @@ async def scheduled_pdf(context: ContextTypes.DEFAULT_TYPE):
         f.write(data)
 
     await context.bot.send_message(
-        chat_id=config.CHAT_ID,
-        text="✅ Вышла новая редакция файла"
+        chat_id=config.CHAT_ID, text="✅ Вышла новая редакция файла"
     )
-    await context.bot.send_document(
-        chat_id=config.CHAT_ID,
-        document=open(local, "rb")
-    )
+    await context.bot.send_document(chat_id=config.CHAT_ID, document=open(local, "rb"))
     logger.info(f"Sent PDF {fname}")
 
     st["last_pdf_hash"] = new_hash
-    st["last_pdf"]      = fname
+    st["last_pdf"] = fname
     save_state(st)
 
+
 async def scheduled_news(context: ContextTypes.DEFAULT_TYPE):
-    st            = load_state()
+    st = load_state()
     last_news_url = st["last_news_url"]
 
     title, url = fetch_latest_news()
@@ -171,12 +173,13 @@ async def scheduled_news(context: ContextTypes.DEFAULT_TYPE):
     st["last_news_url"] = url
     save_state(st)
 
+
 async def scheduled_stranica(context: ContextTypes.DEFAULT_TYPE):
     """
     Проверяем страницу STRANICA_URL на изменения (через хеш body-текста).
     """
-    st         = load_state()
-    last_hash  = st["last_stranica_hash"]
+    st = load_state()
+    last_hash = st["last_stranica_hash"]
 
     try:
         content = fetch_stranica()
@@ -194,17 +197,19 @@ async def scheduled_stranica(context: ContextTypes.DEFAULT_TYPE):
 
     await context.bot.send_message(
         chat_id=config.CHAT_ID,
-        text=f"ℹ️ Обновления на странице 1:\n{config.STRANICA_URL}"
+        text=f"ℹ️ Обновления на странице 1:\n{config.STRANICA_URL}",
     )
     logger.info("Sent page-1 update notification")
+
 
 # ──────────────────────────────────────────────────────────
 async def cmd_state(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     st = load_state()
     await update.message.reply_text(
         f"Текущее состояние:\n```json\n{json.dumps(st, indent=2, ensure_ascii=False)}\n```",
-        parse_mode="MarkdownV2"
+        parse_mode="MarkdownV2",
     )
+
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
@@ -214,6 +219,8 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "/getnews — получить текущую новость\n"
         "/state — показать сохранённое состояние"
     )
+
+
 # ──────────────────────────────────────────────────────────
 async def cmd_getpdf(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     fname, furl = fetch_latest_pdf()
@@ -227,44 +234,44 @@ async def cmd_getpdf(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         for chunk in r.iter_content(32_768):
             f.write(chunk)
     await ctx.bot.send_message(chat_id=update.effective_chat.id, text="✅ Текущий PDF:")
-    await ctx.bot.send_document(chat_id=update.effective_chat.id,
-                                document=open(local, "rb"))
+    await ctx.bot.send_document(
+        chat_id=update.effective_chat.id, document=open(local, "rb")
+    )
+
 
 async def cmd_getnews(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     title, url = fetch_latest_news()
     if not url:
         return await update.message.reply_text("Новостей не найдено.")
     await ctx.bot.send_message(
-        chat_id=update.effective_chat.id,
-        text=f"📰 Текущая новость:\n{title}\n{url}"
+        chat_id=update.effective_chat.id, text=f"📰 Текущая новость:\n{title}\n{url}"
     )
+
 
 # ──────────────────────────────────────────────────────────
 async def global_error_handler(update: object, context: ContextTypes.DEFAULT_TYPE):
     logger.error("Unhandled exception:", exc_info=context.error)
+
 
 def main():
     app = ApplicationBuilder().token(config.BOT_TOKEN).build()
     app.add_error_handler(global_error_handler)
 
     jq = app.job_queue
-    jq.run_repeating(scheduled_pdf,
-                     interval=config.CHECK_EVERY_MINUTES * 60,
-                     first=5)
-    jq.run_repeating(scheduled_news,
-                     interval=config.NEWS_CHECK_INTERVAL * 60,
-                     first=10)
-    jq.run_repeating(scheduled_stranica,
-                     interval=config.STRANICA_CHECK_INTERVAL * 60,
-                     first=15)
+    jq.run_repeating(scheduled_pdf, interval=config.CHECK_EVERY_MINUTES * 60, first=5)
+    jq.run_repeating(scheduled_news, interval=config.NEWS_CHECK_INTERVAL * 60, first=10)
+    jq.run_repeating(
+        scheduled_stranica, interval=config.STRANICA_CHECK_INTERVAL * 60, first=15
+    )
 
-    app.add_handler(CommandHandler("start",  cmd_start))
-    app.add_handler(CommandHandler("state",  cmd_state))
+    app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("state", cmd_state))
     app.add_handler(CommandHandler("getpdf", cmd_getpdf))
-    app.add_handler(CommandHandler("getnews",cmd_getnews))
+    app.add_handler(CommandHandler("getnews", cmd_getnews))
 
     logger.info("Bot started, polling…")
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()

@@ -8,7 +8,9 @@ from monitor import config
 
 
 class DummyResponse:
-    def __init__(self, *, text: str = "", content: bytes = None, status_code: int = 200):
+    def __init__(
+        self, *, text: str = "", content: bytes = None, status_code: int = 200
+    ):
         self.text = text
         self.content = content if content is not None else text.encode("utf-8")
         self.status_code = status_code
@@ -37,12 +39,16 @@ def test_fetch_latest_pdf_picks_newest_and_skips_404(monkeypatch):
     </body></html>
     """
     # Подменяем GET страницы
-    monkeypatch.setattr(session, "get", lambda url, **kw: DummyResponse(text=html, status_code=200))
+    monkeypatch.setattr(
+        session, "get", lambda url, **kw: DummyResponse(text=html, status_code=200)
+    )
+
     # Подменяем HEAD: первый — 404, второй — 200
     def fake_head(url, **kw):
         if "01012020" in url:
             return DummyResponse(status_code=404)
         return DummyResponse(status_code=200)
+
     monkeypatch.setattr(session, "head", fake_head)
 
     name, url = fetch_latest_pdf()
@@ -58,7 +64,9 @@ def test_fetch_latest_pdf_all_404_returns_none(monkeypatch):
     </body></html>
     """
     monkeypatch.setattr(session, "get", lambda *args, **kw: DummyResponse(text=html))
-    monkeypatch.setattr(session, "head", lambda *args, **kw: DummyResponse(status_code=404))
+    monkeypatch.setattr(
+        session, "head", lambda *args, **kw: DummyResponse(status_code=404)
+    )
 
     name, url = fetch_latest_pdf()
     assert name is None and url is None
@@ -121,9 +129,10 @@ def test_date_parsing_variants(monkeypatch):
     """
     monkeypatch.setattr(session, "get", lambda *args, **kw: DummyResponse(text=html))
     # оба HEAD = 200, поэтому выберем max по дате (они равны — тогда последний в списке)
-    monkeypatch.setattr(session, "head", lambda *args, **kw: DummyResponse(status_code=200))
+    monkeypatch.setattr(
+        session, "head", lambda *args, **kw: DummyResponse(status_code=200)
+    )
 
     name, url = fetch_latest_pdf()
     assert name in ("free_flats_20230115.pdf", "free_flats_15012023_.pdf")
     assert url.startswith(config.BASE_URL)
-
