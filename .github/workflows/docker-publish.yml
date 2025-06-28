@@ -39,10 +39,10 @@ jobs:
       - name: Deploy to Yandex VM via SSH
         uses: appleboy/ssh-action@v1
         with:
-        host: ${{ secrets.YC_VM_HOST }}
-        username: ${{ secrets.YC_VM_USER }}
-        key: ${{ secrets.VM_SSH_KEY }}
-        script: |
+           host: ${{ secrets.YC_VM_HOST }}
+           username: ${{ secrets.YC_VM_USER }}
+           key: ${{ secrets.VM_SSH_KEY }}
+           script: |
               set -e
     
               # 1) Установим Yandex Cloud CLI, если нет
