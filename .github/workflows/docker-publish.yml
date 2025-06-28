@@ -46,11 +46,10 @@ jobs:
               - name: Deploy via git-pull on VM
                 run: |
                     ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} <<'EOF'
-                      cd ~/free-flats-bot
+                      cd ~/uks_checker
                       git pull origin main
                       docker compose pull free-flats-bot
                       docker compose up -d
-                    EOF
                     docker image prune -f
                     EOF
                 
