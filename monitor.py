@@ -206,7 +206,8 @@ async def scheduled_stranica(context: ContextTypes.DEFAULT_TYPE):
 async def cmd_state(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     st = load_state()
     await update.message.reply_text(
-        f"Текущее состояние:\n```json\n{json.dumps(st, indent=2, ensure_ascii=False)}\n```",
+        f"Текущее состояние:\n```json\n{
+            json.dumps(st, indent=2, ensure_ascii=False)}\n```",
         parse_mode="MarkdownV2",
     )
 
