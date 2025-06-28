@@ -59,8 +59,8 @@ jobs:
                       | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
         
                     # подтягиваем и перезапускаем сервис
-                    docker-compose pull free-flats-bot
-                    docker-compose up -d free-flats-bot
+                    docker compose pull free-flats-bot
+                    docker compose up -d free-flats-bot
         
                     # чистим dangling images
                     docker image prune -f
