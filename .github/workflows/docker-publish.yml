@@ -30,13 +30,11 @@ jobs:
           context: .
           push: true
           tags: ghcr.io/${{ github.repository }}/free-flats-bot:latest
-
- deploy-to-vm:
-  needs: build-and-push
-  runs-on: ubuntu-latest
-  if: github.ref == 'refs/heads/main'
-
-  steps:
+  deploy-to-vm:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
     # Клонируем репо, чтобы получить локальный docker-compose.yml
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -61,5 +59,4 @@ jobs:
           BOT_TOKEN='${{ secrets.BOT_TOKEN }}' \
             docker-compose up -d free-flats-bot
           docker image prune -f
-        EOF
-
+        EOF  
