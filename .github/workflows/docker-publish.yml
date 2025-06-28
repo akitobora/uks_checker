@@ -54,6 +54,7 @@ jobs:
     
               # 2) Установим credential helper для Docker
               #    (он тоже скопируется в ~/.local/bin)
+              exec -l $SHELL
               if ! command -v docker-credential-yc &>/dev/null; then
                 echo '${{ secrets.YC_SA_JSON }}' > ~/sa.json
                 yc init --service-account-key-file ~/sa.json --force
