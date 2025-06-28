@@ -31,33 +31,35 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository }}/free-flats-bot:latest
 
-  deploy-to-vm:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+ deploy-to-vm:
+  needs: build-and-push
+  runs-on: ubuntu-latest
+  if: github.ref == 'refs/heads/main'
 
-    steps:
-      - name: Start SSH-agent
-        uses: webfactory/ssh-agent@v0.5.4
-        with:
-          ssh-private-key: ${{ secrets.VM_SSH_KEY }}
+  steps:
+    # Клонируем репо, чтобы получить локальный docker-compose.yml
+    - name: Checkout repository
+      uses: actions/checkout@v3
 
-      - name: Copy docker-compose.yml to VM
-        run: |
-          scp -o StrictHostKeyChecking=no docker-compose.yml \
-              ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/free-flats-bot/docker-compose.yml
+    - name: Start SSH-agent
+      uses: webfactory/ssh-agent@v0.5.4
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Deploy via docker-compose
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
-            cd ~/free-flats-bot
+    - name: Copy docker-compose.yml to VM
+      run: |
+        scp -o StrictHostKeyChecking=no \
+            docker-compose.yml \
+            ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/free-flats-bot/docker-compose.yml
 
-            # тянем новую версию образа
-            docker-compose pull free-flats-bot
+    - name: Deploy via docker-compose
+      run: |
+        ssh -o StrictHostKeyChecking=no \
+            ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+          cd ~/free-flats-bot
+          docker-compose pull free-flats-bot
+          BOT_TOKEN='${{ secrets.BOT_TOKEN }}' \
+            docker-compose up -d free-flats-bot
+          docker image prune -f
+        EOF
 
-            # поднимаем (остановит старый, если нужно) в фоновом режиме
-            BOT_TOKEN='${{ secrets.BOT_TOKEN }}' docker-compose up -d free-flats-bot
-
-            # опционально: чистим неиспользуемые образы
-            docker image prune -f
-          EOF
