@@ -57,9 +57,9 @@ jobs:
           ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
           cd ~/free-flats-bot
           # подтягиваем свежий образ
-          docker-compose pull free-flats-bot
+          docker compose pull free-flats-bot
           # запускаем, переменные из .env уже подхватятся автоматически
-          docker-compose up -d free-flats-bot
+          docker compose up -d free-flats-bot
           # чистим неиспользуемые образы
           docker image prune -f
         EOF
