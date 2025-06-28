@@ -46,7 +46,7 @@ jobs:
               - name: Copy compose + .env to VM
                 run: |
                   scp -o StrictHostKeyChecking=no \
-                      docker-compose.yml .env \
+                      . \
                       ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/free-flats-bot/
         
               - name: Deploy via docker-compose
