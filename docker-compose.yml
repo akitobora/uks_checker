@@ -9,7 +9,7 @@ services:
       - TZ=Europe/Minsk  
     volumes:
       # чтобы сохранялось состояние между перезапусками
-      - ./last.json:/app/last.json
+      - ./state:/app
       # если хотите сохранять скачанные PDF
       - downloads:/app/downloads
 
