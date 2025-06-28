@@ -45,23 +45,18 @@ jobs:
         
               - name: Copy compose + .env to VM
                 run: |
-                  scp -o StrictHostKeyChecking=no \
-                      . \
+                  scp -o -r StrictHostKeyChecking=no \
+                       \
                       ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/free-flats-bot/
         
-              - name: Deploy via docker-compose
-                run: |
-                  ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} <<EOF
-                    cd ~/free-flats-bot
-        
-                    # логинимся в GHCR напрямую, подставляя секрет и логин на этапе запуска
-                    echo "${{ secrets.CR_PAT }}" \
-                      | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
-        
-                    # подтягиваем и перезапускаем сервис
-                    docker compose pull free-flats-bot
-                    docker compose up -d free-flats-bot
-        
+                      - name: Deploy via git-pull on VM
+                      run: |
+                        ssh -o StrictHostKeyChecking=no ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} <<'EOF'
+                          cd ~/free-flats-bot
+                          git pull origin main
+                          docker-compose pull free-flats-bot
+                          docker-compose up -d
+                        EOF             
                     # чистим dangling images
                     docker image prune -f
                   EOF
