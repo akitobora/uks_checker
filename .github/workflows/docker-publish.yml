@@ -40,7 +40,7 @@ jobs:
       - name: Start SSH-agent
         uses: webfactory/ssh-agent@v0.5.4
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.VM_SSH_KEY }}
 
       - name: Copy docker-compose.yml to VM
         run: |
