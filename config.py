@@ -17,3 +17,5 @@ NEWS_LINK_RE         = os.environ.get("NEWS_LINK_RE",
                           r"^/novosti/\d+")  # относительный href
 CHECK_EVERY_MINUTES  = int(os.environ.get("CHECK_EVERY_MINUTES", 30))
 STATE_FILE           = os.environ.get("STATE_FILE", "last.json")
+STRANICA_URL = "https://uksgomel.by/stranica-1"
+STRANICA_CHECK_INTERVAL = 60    # в минутах
