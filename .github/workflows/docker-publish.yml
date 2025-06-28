@@ -34,9 +34,9 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-    
+
     steps:
-    # Клонируем репо, чтобы получить локальный docker-compose.yml
+
     - name: Checkout repository
       uses: actions/checkout@v3
 
@@ -45,19 +45,21 @@ jobs:
       with:
         ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-    - name: Copy docker-compose.yml to VM
+    - name: Copy compose + .env to VM
       run: |
         scp -o StrictHostKeyChecking=no \
-            docker-compose.yml \
-            ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/free-flats-bot/docker-compose.yml
+          docker-compose.yml .env \
+          ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }}:~/free-flats-bot/
 
     - name: Deploy via docker-compose
       run: |
         ssh -o StrictHostKeyChecking=no \
-            ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+          ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
           cd ~/free-flats-bot
+          # подтягиваем свежий образ
           docker-compose pull free-flats-bot
-          BOT_TOKEN='${{ secrets.BOT_TOKEN }}' \
-            docker-compose up -d free-flats-bot
+          # запускаем, переменные из .env уже подхватятся автоматически
+          docker-compose up -d free-flats-bot
+          # чистим неиспользуемые образы
           docker image prune -f
-        EOF  
+        EOF
