@@ -268,6 +268,7 @@ def main():
     listen="0.0.0.0",
     port=80,
     webhook_url="https://bba7ujaae80r5nogivh1.containers.yandexcloud.net/"
+    )
 
 if __name__ == "__main__":
     main()
