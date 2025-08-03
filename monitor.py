@@ -266,7 +266,7 @@ def main():
     logger.info("Bot started, polling…")
     app.run_webhook(
     listen="0.0.0.0",
-    port=80,
+    port=8080,
     webhook_url="https://bba7ujaae80r5nogivh1.containers.yandexcloud.net/"
     )
 
