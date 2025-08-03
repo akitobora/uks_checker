@@ -271,6 +271,6 @@ def main():
     webhook_url="https://bba7ujaae80r5nogivh1.containers.yandexcloud.net/"
     )
 """
-    application.run_polling()
+    app.run_polling()
 if __name__ == "__main__":
     main()
