@@ -1,15 +1,16 @@
 services:
   free-flats-bot:
-    image: ghcr.io/akitobora/uks_checker/free-flats-bot:latest
+    build: .
     container_name: free-flats-bot
     restart: unless-stopped
     env_file:
       - .env
     environment:
-      - TZ=Europe/Minsk  
+      - TZ=Europe/Minsk
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       # чтобы сохранялось состояние между перезапусками
-      - ./state:/app
+      - ./state:/app/state
       # если хотите сохранять скачанные PDF
       - downloads:/app/downloads
 
